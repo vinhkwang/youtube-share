@@ -3,5 +3,4 @@ set -e
 
 bundle exec rails db:create 2>/dev/null || true
 bundle exec rails ridgepole:apply
-
-exec "$@"
+exec bundle exec rails server -b 0.0.0.0 -p $PORT
