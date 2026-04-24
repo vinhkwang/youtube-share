@@ -10,7 +10,6 @@ A full-stack video sharing platform built with **Ruby on Rails 7** (API) and **R
 - **Share YouTube Videos** — paste any YouTube URL; title and thumbnail are fetched automatically via oEmbed (no API key needed)
 - **Real-time Notifications** — toast banners appear instantly for all connected users when a video is shared (ActionCable)
 - **Paginated Video Feed** — newest-first feed with pagination
-- **Background Jobs** — Sidekiq + Redis for async processing
 - **Declarative Schema** — Ridgepole manages the DB schema (no migration files)
 - **Docker-ready** — single `docker-compose up --build` to run everything
 
@@ -25,7 +24,6 @@ A full-stack video sharing platform built with **Ruby on Rails 7** (API) and **R
 | Database | PostgreSQL 15 |
 | Real-time | ActionCable (WebSockets) |
 | Auth | JWT (`jwt` gem) + bcrypt (`has_secure_password`) |
-| Background Jobs | Sidekiq + Redis 7 |
 | Schema Management | Ridgepole |
 | Tests | RSpec, FactoryBot, shoulda-matchers |
 
@@ -36,7 +34,6 @@ A full-stack video sharing platform built with **Ruby on Rails 7** (API) and **R
 - Ruby 3.2.2 ([rbenv](https://github.com/rbenv/rbenv) or [rvm](https://rvm.io))
 - Node 18+ ([nvm](https://github.com/nvm-sh/nvm) recommended)
 - PostgreSQL 15
-- Redis 7 (optional for local dev — see note below)
 - Docker + Docker Compose (optional)
 
 ---
@@ -46,7 +43,7 @@ A full-stack video sharing platform built with **Ruby on Rails 7** (API) and **R
 ### 1. Clone the repo
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/vinhkwang/youtube-share.git
 cd youtube-share
 ```
 
@@ -106,7 +103,7 @@ VITE_CABLE_URL=ws://localhost:5000/cable
 
 ## Running Locally
 
-Open three terminals:
+Open two terminals:
 
 ```bash
 # Terminal 1 — Rails API (port 5000)
@@ -116,13 +113,7 @@ bundle exec rails server -p 5000
 # Terminal 2 — React dev server (port 3000)
 cd frontend
 npm run dev
-
-# Terminal 3 — Sidekiq (optional, for background jobs)
-cd backend
-bundle exec sidekiq
 ```
-
-> **Note:** Redis is only required if you use the `redis` ActionCable adapter or Sidekiq. For local dev, `cable.yml` defaults to the `async` adapter so Redis is not needed.
 
 Visit `http://localhost:3000`.
 
@@ -139,7 +130,6 @@ docker-compose up --build
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:5000 |
-| Sidekiq UI | http://localhost:5000/sidekiq |
 | PostgreSQL | localhost:5432 |
 | Redis | localhost:6379 |
 
@@ -178,31 +168,6 @@ To modify the schema, edit `db/schemas/users.rb` or `db/schemas/videos.rb`, then
 
 ---
 
-## API Reference
-
-### Auth
-
-| Method | Endpoint | Auth | Body | Response |
-|---|---|---|---|---|
-| `POST` | `/api/v1/auth/register` | No | `{ email, username, password, password_confirmation }` | `{ user, token }` |
-| `POST` | `/api/v1/auth/login` | No | `{ email, password }` | `{ user, token }` |
-| `GET` | `/api/v1/auth/me` | Bearer token | — | `{ user }` |
-
-### Videos
-
-| Method | Endpoint | Auth | Notes |
-|---|---|---|---|
-| `GET` | `/api/v1/videos?page=1` | No | Paginated, newest first |
-| `GET` | `/api/v1/videos/:id` | No | Single video |
-| `POST` | `/api/v1/videos` | Bearer token | `{ youtube_url }` — fetches metadata automatically |
-
-All authenticated requests require the header:
-```
-Authorization: Bearer <token>
-```
-
----
-
 ## Running Tests
 
 ```bash
@@ -221,66 +186,3 @@ bundle exec rspec spec/services/
 ```
 
 ---
-
-## Project Structure
-
-```
-youtube-share/
-├── docker-compose.yml
-├── backend/
-│   ├── app/
-│   │   ├── channels/
-│   │   │   └── notifications_channel.rb
-│   │   ├── controllers/api/v1/
-│   │   │   ├── auth_controller.rb
-│   │   │   └── videos_controller.rb
-│   │   ├── models/
-│   │   │   ├── user.rb
-│   │   │   └── video.rb
-│   │   └── services/
-│   │       ├── json_web_token.rb
-│   │       ├── youtube_url_extractor.rb
-│   │       └── youtube_metadata_fetcher.rb
-│   ├── db/
-│   │   ├── Schemafile
-│   │   └── schemas/
-│   │       ├── users.rb
-│   │       └── videos.rb
-│   └── spec/
-│       ├── models/
-│       ├── requests/
-│       └── services/
-└── frontend/
-    └── src/
-        ├── components/
-        │   ├── Header.jsx
-        │   ├── VideoCard.jsx
-        │   ├── NotificationBanner.jsx
-        │   └── ShareModal.jsx
-        ├── context/AuthContext.jsx
-        ├── hooks/useActionCable.js
-        ├── pages/
-        │   ├── Home.jsx
-        │   ├── Login.jsx
-        │   └── Register.jsx
-        └── services/api.js
-```
-
----
-
-## Troubleshooting
-
-**`fe_sendauth: no password supplied`**
-→ `dotenv-rails` gem is not loading your `.env`. Run `bundle install` and restart the Rails server.
-
-**`cannot load such file -- db/schemas/users`**
-→ Schema files must have `.rb` extension, not `.schema`. They are already named correctly in this project.
-
-**Frontend shows "Failed to load videos"**
-→ The Rails backend is not running. Start it with `bundle exec rails server -p 5000`.
-
-**No real-time notifications appearing**
-→ Check: (1) Rails server is running, (2) `cable.yml` adapter is `async` for local dev (no Redis needed), (3) browser console for WebSocket connection errors.
-
-**`Cannot find native binding` error in WSL**
-→ `node_modules` was installed on Windows but you're running in WSL. Delete `node_modules` and `package-lock.json`, then run `npm install` from within WSL using Node 20+.
